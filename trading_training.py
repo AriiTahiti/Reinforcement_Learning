@@ -27,6 +27,11 @@ list_to_drop_fast = [
 # train test split
 data_train, data_test, = train_test_split(data, test_size=0.20, random_state=42, shuffle=False)
 
+
+# hold performance
+data_test = data_test.reset_index(drop=True)
+
+
 env_train = RL_trading_environment(
     observation=data_train,
     next_open_variable="next_Open",
@@ -71,6 +76,19 @@ model = keras.models.Sequential(
             ]
         )
 
+
+model = keras.models.Sequential(
+            [
+                keras.layers.Dense(128, activation='relu', input_shape=[n_inputs]),
+                keras.layers.BatchNormalization(),
+                keras.layers.Dropout(0.3),
+                keras.layers.Dense(32, activation='relu'),
+                keras.layers.BatchNormalization(),
+                keras.layers.Dropout(0.3),
+                keras.layers.Dense(n_output),
+            ]
+)
+
 env_train.observation_state
 
 """
@@ -94,7 +112,7 @@ Next step in Deep Q-Learning, we need to create a 'replay_buffer' so that we can
 In this replay_buffer, we will sample a random training batch at each training iteration
 """
 
-replay_buffer = deque(maxlen=2000)
+replay_buffer = deque(maxlen=480)
 
 """
 Now  we need to code a function that will register a single experience. An experience is composed of 5 
@@ -136,9 +154,9 @@ Finally we can create a function that sample a batch of experiences from the rep
 performing a Gradient Descent Step
 """
 
-batch_size = 512
-discount_factor = 0.95
-optimizer = keras.optimizers.Adam(lr=0.001)
+batch_size = 128
+discount_factor = 0.99
+optimizer = keras.optimizers.Adam(lr=0.0005)
 loss_fn = keras.losses.mean_squared_error
 
 
@@ -170,7 +188,7 @@ First we can not train because the replay_buffer is empty. So we need to fill th
 some experiences before using it
 """
 
-for episode in range(1):
+for episode in range(2):
     obs = env_train.observation_state
     done = False
     step = 0
@@ -180,7 +198,7 @@ for episode in range(1):
         epsilon = max(1 - step / 100000, 0.008)
         obs, reward, done = play_one_step(env_train, obs, epsilon)
         print(env_train.done)
-        if step % 1000 == 0:
+        if step % 96 == 0:
             training_step(batch_size)
 
 
@@ -204,6 +222,7 @@ for episode in range(1):
 
 
 model.get_weights()
+
 
 model.summary()
 

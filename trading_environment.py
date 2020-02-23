@@ -1,3 +1,6 @@
+from math import log
+
+
 class RL_trading_environment:
     def __init__(
         self,
@@ -41,7 +44,6 @@ class RL_trading_environment:
         self.T_C = float(transaction_cost_param)
 
         # Agent parameters : This part is to save information about the learning experience of the agent
-
         self.number_of_transactions = int(0)
         self.number_of_long_position = int(0)
         self.number_of_short_position = int(0)
@@ -52,7 +54,7 @@ class RL_trading_environment:
         self.position_realized = [0]
 
         # action_space is used to map the action number with the definition
-        self.action_space = {"hold": 0, "buy": 1, "short": 2}
+        self.action_space = {"hold": 0, "buy": 1, "sell": 2}
         self.current_action = int(0)
         self.actions_realized = [0]
 
@@ -66,9 +68,6 @@ class RL_trading_environment:
         # done
         self.done = False
 
-    def moving_window(self):
-
-        pass
 
     def reward_function(
         self,
@@ -90,7 +89,7 @@ class RL_trading_environment:
             or (current_position == 1 & action == 1)
         ):
 
-            rewarded_action = (
+            rewarded_action = log(
                 portfolio_value
                 * (
                     1
@@ -102,7 +101,7 @@ class RL_trading_environment:
             return rewarded_action
 
         elif current_position == 1 and action == 2:
-            rewarded_action = (
+            rewarded_action = log(
                 portfolio_value
                 * (
                     1
@@ -118,7 +117,7 @@ class RL_trading_environment:
             or (current_position == 2 and action == 0)
             or (current_position == 2 and action == 2)
         ):
-            rewarded_action = (
+            rewarded_action = log(
                 portfolio_value
                 * (
                     1
@@ -130,7 +129,7 @@ class RL_trading_environment:
             return rewarded_action
 
         elif current_position == 2 and action == 1:
-            rewarded_action = (
+            rewarded_action = log(
                 portfolio_value
                 * (
                     1
