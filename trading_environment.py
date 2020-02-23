@@ -1,15 +1,4 @@
-
-
-"""
-To train a training agent, we need 3 things : 
-    1- old state information paired with an action
-    2- the next-state
-    3- the reward
-"""
-
-
 class RL_trading_environment:
-
     def __init__(
         self,
         observation,
@@ -23,10 +12,10 @@ class RL_trading_environment:
 
         """
         :param observation: it's a time series dataset containing all the observation needed to do the prediction
-        :param next_open_variable: name of the column for the
-        :param next_close_variable:
-        :param list_to_drop:
-        :param initial_balance:
+        :param next_open_variable: name of the column for the next open. this is used to compute the next reward
+        :param next_close_variable: name of the column for the next close. this is used to compute the next reward
+        :param list_to_drop: list of the features you want to drop from your original time series dataset
+        :param initial_balance: initial balance
         :param spread_param:
         :param transaction_cost_param:
         """
@@ -77,6 +66,10 @@ class RL_trading_environment:
         # done
         self.done = False
 
+    def moving_window(self):
+
+        pass
+
     def reward_function(
         self,
         portfolio_value,
@@ -91,8 +84,11 @@ class RL_trading_environment:
             rewarded_action = 0
             return rewarded_action
 
-        elif (current_position == 0 and action == 1) or (current_position == 1 and action == 0) or\
-                (current_position == 1 & action == 1):
+        elif (
+            (current_position == 0 and action == 1)
+            or (current_position == 1 and action == 0)
+            or (current_position == 1 & action == 1)
+        ):
 
             rewarded_action = (
                 portfolio_value
@@ -117,16 +113,19 @@ class RL_trading_environment:
             )
             return rewarded_action
 
-        elif (current_position == 0 and action == 2) or (current_position == 2 and action == 0) or\
-                (current_position == 2 and action == 2):
+        elif (
+            (current_position == 0 and action == 2)
+            or (current_position == 2 and action == 0)
+            or (current_position == 2 and action == 2)
+        ):
             rewarded_action = (
-                    portfolio_value
-                    * (
-                            1
-                            + (entering_price - next_close_price) / entering_price
-                            - 2 * (self.T_C + self.spread)
-                    )
-                    / portfolio_value
+                portfolio_value
+                * (
+                    1
+                    + (entering_price - next_close_price) / entering_price
+                    - 2 * (self.T_C + self.spread)
+                )
+                / portfolio_value
             )
             return rewarded_action
 
@@ -162,15 +161,22 @@ class RL_trading_environment:
             self.Price_enter_Position = self.next_open_state
 
             # count the number of long position
-            if [self.current_position_state, self.current_action] == entering_position[0]:
+            if [self.current_position_state, self.current_action] == entering_position[
+                0
+            ]:
                 self.number_of_long_position += 1
 
             # count the number of short position
-            elif [self.current_position_state, self.current_action] == entering_position[0]:
+            elif [
+                self.current_position_state,
+                self.current_action,
+            ] == entering_position[0]:
                 self.number_of_short_position += 1
 
         # count the total number of transaction
-        self.number_of_transactions = 2 * (self.number_of_long_position + self.number_of_short_position)
+        self.number_of_transactions = 2 * (
+            self.number_of_long_position + self.number_of_short_position
+        )
 
         # here we define the state our agent will be depending on the [state, action] couple
         position_0 = [[0, 0], [2, 1], [1, 2]]
@@ -195,10 +201,10 @@ class RL_trading_environment:
             self.next_close_state,
             self.next_open_state,
             self.current_position_state,
-            self.current_action
+            self.current_action,
         )
 
-        self.cumulative_rewards = (self.current_portfolio_value * self.reward)
+        self.cumulative_rewards = self.current_portfolio_value * self.reward
 
         # after we update the reward, we
         self.index += 1
@@ -209,7 +215,7 @@ class RL_trading_environment:
         self.next_close_state = self.next_close.values[self.index]
 
         # finally, we want to reset the index each time that we achieve the end of the dataset
-        self.done = self.done_function(self.index, (len(self.observation)-1))
+        self.done = self.done_function(self.index, (len(self.observation) - 1))
 
         if self.done:
             self.index = 0
@@ -234,7 +240,6 @@ class RL_trading_environment:
         print("next_close_state ", self.next_close_state)
 
         print("reward ", self.reward)
-
 
     def reset(self):
 

@@ -1,6 +1,6 @@
 # import the environment and the agent
 
-from RL_code.trading_environment import RL_trading_environment
+from trading_environment import RL_trading_environment
 
 import numpy as np
 import pandas as pd
@@ -9,8 +9,9 @@ import tensorflow as tf
 from tensorflow import keras
 
 from collections import deque
+from sklearn.model_selection import train_test_split
 
-data = pd.read_csv("dataset/data_complet_5min.csv")
+data = pd.read_csv("/Users/ariisichoix/Desktop/data_source/data_complet_5min.csv")
 
 list_to_drop_fast = [
     "Timestamp",
@@ -23,8 +24,21 @@ list_to_drop_fast = [
     "next_Close",
 ]
 
-env = RL_trading_environment(
-    observation=data,
+# train test split
+data_train, data_test, = train_test_split(data, test_size=0.20, random_state=42, shuffle=False)
+
+env_train = RL_trading_environment(
+    observation=data_train,
+    next_open_variable="next_Open",
+    next_close_variable="next_Close",
+    list_to_drop=list_to_drop_fast,
+    initial_balance=100000,
+    spread_param=0.0005,
+    transaction_cost_param=0.00002,
+)
+
+env_test = RL_trading_environment(
+    observation=data_test,
     next_open_variable="next_Open",
     next_close_variable="next_Close",
     list_to_drop=list_to_drop_fast,
@@ -34,20 +48,30 @@ env = RL_trading_environment(
 )
 
 
-
-n_inputs = len(env.observation_state)
-n_output = len(env.action_space)
+n_inputs = len(env_train.observation_state)
+n_output = len(env_train.action_space)
 
 
 model = keras.models.Sequential(
-    [
-        keras.layers.Dense(32, activation="elu", input_shape=[n_inputs]),
-        keras.layers.Dense(32, activation="elu"),
-        keras.layers.Dense(n_output),
-    ]
-)
+            [
+                keras.layers.Dense(128, activation='relu', input_shape=[n_inputs]),
+                keras.layers.BatchNormalization(),
+                keras.layers.Dropout(0.3),
+                keras.layers.Dense(256, activation='relu'),
+                keras.layers.BatchNormalization(),
+                keras.layers.Dropout(0.5),
+                keras.layers.Dense(128, activation='relu'),
+                keras.layers.BatchNormalization(),
+                keras.layers.Dropout(0.5),
+                keras.layers.Dense(64, activation='relu'),
+                keras.layers.BatchNormalization(),
+                keras.layers.Dropout(0.3),
+                keras.layers.Dense(32, activation='relu'),
+                keras.layers.Dense(n_output),
+            ]
+        )
 
-env.observation_state
+env_train.observation_state
 
 """
 To select an action with DQN, we select the largest predicted Q-Value. To be sure also that the agent explore the
@@ -61,8 +85,8 @@ def epsilon_greedy_policy(state, epsilon=0):
     if np.random.rand() < epsilon:
         return np.random.randint(3)
 
-    Q_value = model.predict(state[np.newaxis])
-    return np.argmax(Q_value[0])
+    q_value = model.predict(state[np.newaxis])
+    return np.argmax(q_value[0])
 
 
 """
@@ -112,7 +136,7 @@ Finally we can create a function that sample a batch of experiences from the rep
 performing a Gradient Descent Step
 """
 
-batch_size = 32
+batch_size = 512
 discount_factor = 0.95
 optimizer = keras.optimizers.Adam(lr=0.001)
 loss_fn = keras.losses.mean_squared_error
@@ -147,27 +171,50 @@ some experiences before using it
 """
 
 for episode in range(1):
-    obs = env.observation_state
+    obs = env_train.observation_state
     done = False
     step = 0
     while not done:
         step += 1
-        print('episode done ', episode, 'step done ', env.index)
-        epsilon = max(1 - episode / 500, 0.001)
-        obs, reward, done = play_one_step(env, obs, epsilon)
-        print(env.done)
-        if step % 100 == 0:
+        print("episode done ", episode, "step done ", env_train.index)
+        epsilon = max(1 - step / 100000, 0.008)
+        obs, reward, done = play_one_step(env_train, obs, epsilon)
+        print(env_train.done)
+        if step % 1000 == 0:
             training_step(batch_size)
 
 
-env.number_of_transactions
+for episode in range(1):
+    obs = env_test.observation_state
+    done = False
+    step = 0
+    while not done:
+        step += 1
+        print("episode done ", episode, "step done ", env_test.index)
+        epsilon = 0
+        obs, reward, done = play_one_step(env_test, obs, epsilon)
+        print(env_test.done)
+        # if step % 1000 == 0:
+        #     training_step(batch_size)
 
-env.number_of_long_position
-
-env.number_of_short_position
 
 
-env.cumulative_rewards
+
+
+
+
+model.get_weights()
+
+model.summary()
+
+env_train.number_of_transactions
+
+env_train.number_of_long_position
+
+env_train.number_of_short_position
+
+env_train.cumulative_rewards
+
 
 
 
@@ -176,12 +223,12 @@ list_actions = env.actions_realized
 
 from collections import Counter
 
-Counter(list_position).keys() # equals to list(set(words))
-Counter(list_position).values() # counts the elements' frequency
+Counter(list_position).keys()  # equals to list(set(words))
+Counter(list_position).values()  # counts the elements' frequency
 
 
 # Save the weights
-model.save_weights('./checkpoints/Warren_Buffet_AI')
+model.save_weights("./checkpoints/Warren_Buffet_AI")
 
 # Create a new model instance
 mode_copy = keras.models.Sequential(
@@ -194,8 +241,6 @@ mode_copy = keras.models.Sequential(
 mode_copy.get_weights()
 
 
-mode_copy.load_weights('./checkpoints/Warren_Buffet_AI')
+mode_copy.load_weights("./checkpoints/Warren_Buffet_AI")
 
 mode_copy.get_weights()
-
-
