@@ -11,7 +11,7 @@ from tensorflow import keras
 from collections import deque
 from sklearn.model_selection import train_test_split
 
-data = pd.read_csv("/Users/ariisichoix/Desktop/data_source/data_complet_5min.csv")
+data = pd.read_csv("/Users/ariisichoix/Desktop/data_source/data_complet_1h.csv")
 
 list_to_drop_fast = [
     "Timestamp",
@@ -37,7 +37,8 @@ env_train = RL_trading_environment(
     next_open_variable="next_Open",
     next_close_variable="next_Close",
     list_to_drop=list_to_drop_fast,
-    initial_balance=100000,
+    initial_balance=10000,
+    trade_size=10000,
     spread_param=0.0005,
     transaction_cost_param=0.00002,
 )
@@ -47,7 +48,8 @@ env_test = RL_trading_environment(
     next_open_variable="next_Open",
     next_close_variable="next_Close",
     list_to_drop=list_to_drop_fast,
-    initial_balance=100000,
+    initial_balance=10000,
+    trade_size=10000,
     spread_param=0.0005,
     transaction_cost_param=0.00002,
 )
@@ -89,7 +91,6 @@ model = keras.models.Sequential(
             ]
 )
 
-env_train.observation_state
 
 """
 To select an action with DQN, we select the largest predicted Q-Value. To be sure also that the agent explore the
@@ -126,6 +127,7 @@ elements :
 
 
 def sample_experiences(batch_size):
+    # from the replay buffer
     indices = np.random.randint(len(replay_buffer), size=batch_size)
     batch = [replay_buffer[index] for index in indices]
     states, actions, rewards, next_states, dones = [
@@ -141,12 +143,27 @@ buffer
 """
 
 
-def play_one_step(env, state, epsilon):
+def play_one_step_action_augmentation(env, state, epsilon):
+
     action = epsilon_greedy_policy(state, epsilon)
+    # we can add to the replay buffer the results given by the other actions {action augmentation loss}
+
+    action_augmented = [0, 1, 2]
+    action_augmented.remove(action)
+
     next_state, reward, done = env.step(action)
+
+
+
+    # put the action augmentation into the replay_buffer
+    # replay_buffer.append((state, action_augmented[0], reward, next_state, done))
+    # replay_buffer.append((state, action_augmented[1], reward, next_state, done))
+
     # put the results of the action in the replay_buffer
     replay_buffer.append((state, action, reward, next_state, done))
+
     return next_state, reward, done
+
 
 
 """
@@ -154,7 +171,7 @@ Finally we can create a function that sample a batch of experiences from the rep
 performing a Gradient Descent Step
 """
 
-batch_size = 128
+batch_size = 480
 discount_factor = 0.99
 optimizer = keras.optimizers.Adam(lr=0.0005)
 loss_fn = keras.losses.mean_squared_error
@@ -188,18 +205,22 @@ First we can not train because the replay_buffer is empty. So we need to fill th
 some experiences before using it
 """
 
-for episode in range(2):
+for episode in range(1):
     obs = env_train.observation_state
     done = False
     step = 0
     while not done:
         step += 1
         print("episode done ", episode, "step done ", env_train.index)
-        epsilon = max(1 - step / 100000, 0.008)
-        obs, reward, done = play_one_step(env_train, obs, epsilon)
+        env_train.get_agent_current_status()
+        epsilon = max(0.1 - episode / 100, 0.0001)
+        obs, reward, done = play_one_step_action_augmentation(env_train, obs, epsilon)
         print(env_train.done)
-        if step % 96 == 0:
+        if step % 160 == 0:
             training_step(batch_size)
+
+
+
 
 
 for episode in range(1):
@@ -209,17 +230,19 @@ for episode in range(1):
     while not done:
         step += 1
         print("episode done ", episode, "step done ", env_test.index)
+        env_test.get_agent_current_status()
         epsilon = 0
-        obs, reward, done = play_one_step(env_test, obs, epsilon)
+        obs, reward, done = play_one_step_action_augmentation(env_test, obs, epsilon)
         print(env_test.done)
         # if step % 1000 == 0:
         #     training_step(batch_size)
 
 
+env_test.get_agent_current_status()
 
+x = np.where(np.array(env_test.cumulative_rewards) > 0,1,0)
 
-
-
+np.mean(x)
 
 model.get_weights()
 
