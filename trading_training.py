@@ -1,6 +1,6 @@
 # import the environment and the agent
 
-from trading_environment import RL_trading_environment
+from trading_environment import RLTradingEnvironment
 
 import numpy as np
 import pandas as pd
@@ -25,14 +25,16 @@ list_to_drop_fast = [
 ]
 
 # train test split
-data_train, data_test, = train_test_split(data, test_size=0.20, random_state=42, shuffle=False)
+data_train, data_test, = train_test_split(
+    data, test_size=0.20, random_state=42, shuffle=False
+)
 
 
 # hold performance
 data_test = data_test.reset_index(drop=True)
 
 
-env_train = RL_trading_environment(
+env_train = RLTradingEnvironment(
     observation=data_train,
     next_open_variable="next_Open",
     next_close_variable="next_Close",
@@ -40,10 +42,10 @@ env_train = RL_trading_environment(
     initial_balance=10000,
     trade_size=10000,
     spread_param=0.0005,
-    transaction_cost_param=0.00002,
+    transaction_cost=0.00002,
 )
 
-env_test = RL_trading_environment(
+env_test = RLTradingEnvironment(
     observation=data_test,
     next_open_variable="next_Open",
     next_close_variable="next_Close",
@@ -51,7 +53,7 @@ env_test = RL_trading_environment(
     initial_balance=10000,
     trade_size=10000,
     spread_param=0.0005,
-    transaction_cost_param=0.00002,
+    transaction_cost=0.00002,
 )
 
 
@@ -60,35 +62,35 @@ n_output = len(env_train.action_space)
 
 
 model = keras.models.Sequential(
-            [
-                keras.layers.Dense(128, activation='relu', input_shape=[n_inputs]),
-                keras.layers.BatchNormalization(),
-                keras.layers.Dropout(0.3),
-                keras.layers.Dense(256, activation='relu'),
-                keras.layers.BatchNormalization(),
-                keras.layers.Dropout(0.5),
-                keras.layers.Dense(128, activation='relu'),
-                keras.layers.BatchNormalization(),
-                keras.layers.Dropout(0.5),
-                keras.layers.Dense(64, activation='relu'),
-                keras.layers.BatchNormalization(),
-                keras.layers.Dropout(0.3),
-                keras.layers.Dense(32, activation='relu'),
-                keras.layers.Dense(n_output),
-            ]
-        )
+    [
+        keras.layers.Dense(128, activation="relu", input_shape=[n_inputs]),
+        keras.layers.BatchNormalization(),
+        keras.layers.Dropout(0.3),
+        keras.layers.Dense(256, activation="relu"),
+        keras.layers.BatchNormalization(),
+        keras.layers.Dropout(0.5),
+        keras.layers.Dense(128, activation="relu"),
+        keras.layers.BatchNormalization(),
+        keras.layers.Dropout(0.5),
+        keras.layers.Dense(64, activation="relu"),
+        keras.layers.BatchNormalization(),
+        keras.layers.Dropout(0.3),
+        keras.layers.Dense(32, activation="relu"),
+        keras.layers.Dense(n_output),
+    ]
+)
 
 
 model = keras.models.Sequential(
-            [
-                keras.layers.Dense(128, activation='relu', input_shape=[n_inputs]),
-                keras.layers.BatchNormalization(),
-                keras.layers.Dropout(0.3),
-                keras.layers.Dense(32, activation='relu'),
-                keras.layers.BatchNormalization(),
-                keras.layers.Dropout(0.3),
-                keras.layers.Dense(n_output),
-            ]
+    [
+        keras.layers.Dense(128, activation="relu", input_shape=[n_inputs]),
+        keras.layers.BatchNormalization(),
+        keras.layers.Dropout(0.3),
+        keras.layers.Dense(32, activation="relu"),
+        keras.layers.BatchNormalization(),
+        keras.layers.Dropout(0.3),
+        keras.layers.Dense(n_output),
+    ]
 )
 
 
@@ -153,8 +155,6 @@ def play_one_step_action_augmentation(env, state, epsilon):
 
     next_state, reward, done = env.step(action)
 
-
-
     # put the action augmentation into the replay_buffer
     # replay_buffer.append((state, action_augmented[0], reward, next_state, done))
     # replay_buffer.append((state, action_augmented[1], reward, next_state, done))
@@ -163,7 +163,6 @@ def play_one_step_action_augmentation(env, state, epsilon):
     replay_buffer.append((state, action, reward, next_state, done))
 
     return next_state, reward, done
-
 
 
 """
@@ -216,11 +215,8 @@ for episode in range(1):
         epsilon = max(0.1 - episode / 100, 0.0001)
         obs, reward, done = play_one_step_action_augmentation(env_train, obs, epsilon)
         print(env_train.done)
-        if step % 160 == 0:
+        if step % 1000 == 0:
             training_step(batch_size)
-
-
-
 
 
 for episode in range(1):
@@ -240,7 +236,7 @@ for episode in range(1):
 
 env_test.get_agent_current_status()
 
-x = np.where(np.array(env_test.cumulative_rewards) > 0,1,0)
+x = np.where(np.array(env_test.cumulative_rewards) > 0, 1, 0)
 
 np.mean(x)
 
@@ -256,8 +252,6 @@ env_train.number_of_long_position
 env_train.number_of_short_position
 
 env_train.cumulative_rewards
-
-
 
 
 list_position = env.position_realized

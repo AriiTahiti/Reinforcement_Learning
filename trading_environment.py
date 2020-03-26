@@ -1,7 +1,7 @@
 from math import log
 
 
-class RL_trading_environment:
+class RLTradingEnvironment:
     def __init__(
         self,
         observation,
@@ -11,17 +11,21 @@ class RL_trading_environment:
         trade_size=10000,
         initial_balance=10000,
         spread_param=0.0005,
-        transaction_cost_param=0.00002,
+        transaction_cost=0.00002,
     ):
 
         """
-        :param observation: it's a time series dataset containing all the observation needed to do the prediction
-        :param next_open_variable: name of the column for the next open. this is used to compute the next reward
-        :param next_close_variable: name of the column for the next close. this is used to compute the next reward
-        :param list_to_drop: list of the features you want to drop from your original time series dataset
-        :param initial_balance: initial balance
-        :param spread_param: represent an estimation of the bid / ask spread in %
-        :param transaction_cost_param: represent as estimation of the transaction cost in %
+        This function is used to instantiate the class. This instantiation
+
+        Args:
+            observation: it's a time series dataset containing all the observation needed to do the prediction
+            next_open_variable: name of the column for the next open. this is used to compute the next reward
+            next_close_variable: name of the column for the next close. this is used to compute the next reward
+            list_to_drop: list of the features you want to drop from your original time series dataset
+            trade_size: maximum fixed trade size
+            initial_balance: initial balance
+            spread_param: represent an estimation of the bid / ask spread in %
+            transaction_cost: represent as estimation of the transaction cost in %
         """
 
         # define next open variable
@@ -39,24 +43,23 @@ class RL_trading_environment:
         self.next_open_state = self.next_open.values[self.index]
         self.next_close_state = self.next_close.values[self.index]
 
-        # Portfolio value
+        # Portfolio Value
+        self.original_portfolio_value = float(initial_balance)
         self.current_portfolio_value = float(initial_balance)
-        self.constant_trade_size = trade_size
+        self.maximum_trade_size = trade_size
+        self.traded_portfolio_value = min(trade_size, initial_balance)
 
-        # spread : spread bid/ask
-        self.spread = float(spread_param)
-
-        # T_C : Transaction_Cost
-        self.T_C = float(transaction_cost_param)
+        # total_transaction_cost is the sum of bid/ask spread and transaction cost
+        self.total_transaction_cost = float(spread_param) + float(transaction_cost)
 
         # define information for the agent
         self.number_of_transactions = int(0)
         self.number_of_long_position = int(0)
         self.number_of_short_position = int(0)
 
-        # Dictionary of states
+        # Dictionary of position
         self.state_space = {"no_position": 0, "long_position": 1, "short_position": 2}
-        # Current state of the agent
+        # position of the agent
         self.current_position_state = int(0)
         # list of all the position realized
         self.position_realized = [0]
@@ -69,12 +72,16 @@ class RL_trading_environment:
         self.actions_realized = [0]
 
         # object to register the price when the agent enter a position
-        self.Price_enter_Position = float(0)
+        self.price_enter_position = float(0)
+        # object to register the last traded amount
+        self.last_traded_amount = float(0)
 
         # current reward made by the agent
         self.reward = float(0)
         # list of all the reward realized
         self.cumulative_rewards = [0]
+        # portfolio log return
+        self.log_return_portfolio = 0
 
         # boolean object to determine if we reach the end of the dataset
         self.done = False
@@ -82,7 +89,8 @@ class RL_trading_environment:
     # function to compute reward
     def reward_function(
         self,
-        portfolio_value,
+        traded_amount,
+        current_portfolio_amount,
         entering_price,
         next_close_price,
         next_open_price,
@@ -90,79 +98,72 @@ class RL_trading_environment:
         action,
     ):
 
-        if current_position == 0 and action == 0:
+        """
+        Args:
+            traded_amount: is the amount in the current position open
+            current_portfolio_amount :
+            entering_price: price we enter into the position
+            next_close_price: it's the next close price to compute the reward if we stay in current position
+            next_open_price:  it's the next open price to compute the reward if we leave the current position
+            current_position: is the
+            action:
 
+        Returns: the function output the return amount on the trading decision.
+
+        """
+        if current_position == 0 and action == 0:
             rewarded_action = 0
 
-            new_portfolio_value = portfolio_value
+        elif (
+            (current_position == 0 and action == 1)
+            or (current_position == 1 and action == 0)
+            or (current_position == 1 & action == 1)
+        ):
 
-            return rewarded_action, new_portfolio_value
-
-        elif ((current_position == 0 and action == 1) or
-              (current_position == 1 and action == 0) or
-              (current_position == 1 & action == 1)):
-
-            rewarded_action = log(
-                (portfolio_value + min(self.constant_trade_size, portfolio_value) * (
-                    (next_close_price - entering_price) / entering_price - 2 * (self.T_C + self.spread)
-                ))
-                / portfolio_value
+            rewarded_action = traded_amount * (
+                (next_close_price - entering_price) / entering_price
+                - 2 * self.total_transaction_cost
             )
-
-            new_portfolio_value = portfolio_value + min(self.constant_trade_size, portfolio_value) * (
-                    (next_close_price - entering_price) / entering_price - 2 * (self.T_C + self.spread)
-            )
-
-            return rewarded_action, new_portfolio_value
 
         elif current_position == 1 and action == 2:
 
-            rewarded_action = log(
-                (portfolio_value + min(self.constant_trade_size, portfolio_value) * (
-                        (next_open_price - entering_price) / next_open_price - 2 * (self.T_C + self.spread)
-                ))
-                / portfolio_value
+            rewarded_action = traded_amount * (
+                (next_open_price - entering_price) / next_open_price
+                - 2 * self.total_transaction_cost
             )
 
-            new_portfolio_value = portfolio_value + min(self.constant_trade_size, portfolio_value) * (
-                    (next_close_price - entering_price) / entering_price - 2 * (self.T_C + self.spread)
+        elif (
+            (current_position == 0 and action == 2)
+            or (current_position == 2 and action == 0)
+            or (current_position == 2 and action == 2)
+        ):
+
+            rewarded_action = traded_amount * (
+                (entering_price - next_close_price) / entering_price
+                - 2 * self.total_transaction_cost
             )
-
-            return rewarded_action, new_portfolio_value
-
-        elif ((current_position == 0 and action == 2) or
-              (current_position == 2 and action == 0) or
-              (current_position == 2 and action == 2)):
-
-            rewarded_action = log(
-                (portfolio_value + min(self.constant_trade_size, portfolio_value) * (
-                    (entering_price - next_close_price) / entering_price - 2 * (self.T_C + self.spread)
-                ))
-                / portfolio_value
-            )
-
-            new_portfolio_value = portfolio_value + min(self.constant_trade_size, portfolio_value) * (
-                    (entering_price - next_close_price) / entering_price - 2 * (self.T_C + self.spread)
-            )
-            return rewarded_action, new_portfolio_value
 
         elif current_position == 2 and action == 1:
 
-            rewarded_action = log(
-                (portfolio_value + min(self.constant_trade_size, portfolio_value) * (
-                    (entering_price - next_open_price) / entering_price - 2 * (self.T_C + self.spread)
-                ))
-                / portfolio_value
+            rewarded_action = traded_amount * (
+                (entering_price - next_open_price) / entering_price
+                - 2 * self.total_transaction_cost
             )
 
-            new_portfolio_value = portfolio_value + min(self.constant_trade_size, portfolio_value) * (
-                    (entering_price - next_open_price) / entering_price - 2 * (self.T_C + self.spread)
-            )
+        else:
+            raise ValueError("current action or current position is not well defined")
 
-            return rewarded_action, new_portfolio_value
+        new_portfolio_value = current_portfolio_amount + rewarded_action
+
+        return rewarded_action, new_portfolio_value
 
     # function to move in the environment
     def step(self, action):
+
+        # if done than reset data :
+        if self.done:
+            print("--- Resetting Time Series ---")
+            self.reset()
 
         # First we register the action
         self.current_action = action
@@ -173,18 +174,28 @@ class RL_trading_environment:
 
         if [self.current_position_state, self.current_action] in entering_position:
             # we suppose that we are able to enter in position at the next open price
-            self.Price_enter_Position = self.next_open_state
+            self.price_enter_position = self.next_open_state
+            self.last_traded_amount = min(
+                self.current_portfolio_value, self.maximum_trade_size
+            )
 
             # count the number of long position
-            if [self.current_position_state, self.current_action] == entering_position[0]:
+            if [self.current_position_state, self.current_action] == entering_position[
+                0
+            ]:
                 self.number_of_long_position += 1
 
             # count the number of short position
-            elif [self.current_position_state, self.current_action] == entering_position[1]:
+            elif [
+                self.current_position_state,
+                self.current_action,
+            ] == entering_position[1]:
                 self.number_of_short_position += 1
 
         # count the total number of transaction
-        self.number_of_transactions = 2 * (self.number_of_long_position + self.number_of_short_position)
+        self.number_of_transactions = 2 * (
+            self.number_of_long_position + self.number_of_short_position
+        )
 
         # here we define the position our agent will be, depending on the [state, action] couple
         no_position = [[0, 0], [2, 1], [1, 2]]
@@ -204,9 +215,14 @@ class RL_trading_environment:
         self.position_realized.append(self.current_position_state)
 
         # base on the new action (and the sequence of the previous actions) we compute the reward
-        self.reward, self.current_portfolio_value = self.reward_function(
+
+        (
+            self.reward,
+            self.traded_portfolio_value,
+        ) = self.reward_function(
+            self.last_traded_amount,
             self.current_portfolio_value,
-            self.Price_enter_Position,
+            self.price_enter_position,
             self.next_close_state,
             self.next_open_state,
             self.current_position_state,
@@ -215,44 +231,49 @@ class RL_trading_environment:
 
         self.cumulative_rewards.append(self.reward)
 
-        # after we update the reward, we
+        self.log_return_portfolio = 0
+
+        # update current portfolio_value [state, action] :
+        exit_position = [[1, 2], [2, 1]]
+        if [self.current_position_state, self.current_action] in exit_position:
+            self.log_return_portfolio = log(self.traded_portfolio_value/self.current_portfolio_value)
+            self.current_portfolio_value = self.traded_portfolio_value
+
+        # after we update the reward
         self.index += 1
+
+        # finally, we want to reset the index each time that we achieve the end of the dataset
+        if self.index == (len(self.observation) - 1):
+            self.done = True
 
         # update the observations, next_open and next_close
         self.observation_state = self.observation.values[self.index]
         self.next_open_state = self.next_open.values[self.index]
         self.next_close_state = self.next_close.values[self.index]
 
-        # finally, we want to reset the index each time that we achieve the end of the dataset
-        self.done = self.done_function(self.index, len(self.observation))
-
-        if self.done:
-            self.index = 0
-
         # this function output 3 elements : the next observations {S(t+1)}, the reward {R(t)} and if we
-        return self.observation_state, self.reward, self.done
-
-    def done_function(self, index_position, len_dataset):
-        return index_position == (len_dataset-1)
-
+        return self.observation_state, self.log_return_portfolio, self.done
 
     def get_agent_current_status(self):
 
         print("Current Agent Position ", self.current_position_state)
-        print('------------------------')
+        print("------------------------")
         print("Last Action of the Agent ", self.current_action)
-        print('------------------------')
+        print("------------------------")
         print("Current Portfolio Value ", self.current_portfolio_value)
-        print('------------------------')
+        print("------------------------")
         print(" Last Reward ", self.reward)
 
-        print('------------------------')
+        print("------------------------")
         print("number of transaction ", self.number_of_transactions)
         print("number of short position ", self.number_of_short_position)
         print("number of long position ", self.number_of_long_position)
 
     def reset(self):
-
+        """
+        The reset function is used to rest the time series, so the agent
+        will start to learn again on the same dataset
+        """
         self.index = 0
 
         self.observation_state = self.observation.values[self.index]
@@ -261,4 +282,31 @@ class RL_trading_environment:
 
         self.done = False
 
-        return self.observation_state
+        self.current_portfolio_value = self.original_portfolio_value
+
+        # define information for the agent
+        self.number_of_transactions = int(0)
+        self.number_of_long_position = int(0)
+        self.number_of_short_position = int(0)
+
+        # current reward made by the agent
+        self.reward = float(0)
+        # list of all the reward realized
+        self.cumulative_rewards = [0]
+        # portfolio log return
+        self.log_return_portfolio = 0
+
+        # object to register the price when the agent enter a position
+        self.price_enter_position = float(0)
+        # object to register the last traded amount
+        self.last_traded_amount = float(0)
+
+        # position of the agent
+        self.current_position_state = int(0)
+        # list of all the position realized
+        self.position_realized = [0]
+
+        # current action taken by the the agent
+        self.current_action = int(0)
+        # list of all the action realized
+        self.actions_realized = [0]
