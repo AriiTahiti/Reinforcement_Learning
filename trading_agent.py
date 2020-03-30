@@ -35,7 +35,7 @@ class TradingAgent:
 
     def agent_model(self):
         """
-        Returns: This function return a keras model the agent will use to learn how to maximize reward in t
+        Returns: This function return a keras model the agent will use to learn how to maximize reward
         """
 
         model = keras.models.Sequential(
@@ -123,6 +123,9 @@ class TradingAgent:
         action = self.epsilon_greedy_policy(observation, epsilon)
         # we can add to the replay buffer the results given by the other actions {action augmentation loss}
 
+        # add strategy
+
+
         action_augmented = [0, 1, 2]
         action_augmented.remove(action)
 
@@ -140,10 +143,7 @@ class TradingAgent:
     def training_step(self):
 
         """
-        This function will be used to train the model
-
-        Returns:
-
+        Returns: This function will be used to train the model
         """
         # first thing we take the experience from the replay_buffer with the batch_size
         observations, actions, rewards, next_observations, done = self.sample_experiences()

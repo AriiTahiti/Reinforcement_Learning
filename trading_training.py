@@ -50,12 +50,12 @@ agent = TradingAgent(
 )
 
 # Training Loop of the agent
-for episode in range(2):
+for episode in range(1):
     obs = env_train.observation_state
     done = False
     step = 0
     while not done:
-        step += 3
+        step += 1
         print("episode done ", episode, "step done ", env_train.index)
         epsilon = max(0.9 - episode / 1000, 0.00001)
         obs, reward, done = agent.play_one_step_action_augmentation(env_train, obs, epsilon)
@@ -89,14 +89,11 @@ for episode in range(1):
         print(env_test.done)
 
 
-
-
-cumulative_rewards = np.array(env_train.cumulative_rewards)
+cumulative_rewards = np.array(env_train.all_step_rewards)
 cumulative_rewards.min()
 cumulative_rewards.mean()
 
-
-cumulative_rewards = np.array(env_train.cumulative_rewards).cumsum()
+cumulative_rewards = np.array(env_train.all_step_rewards).cumsum()
 
 """
 Create some plots 
@@ -114,66 +111,3 @@ ax.set(xlabel='time (s)', ylabel='reward',
 ax.grid()
 plt.show()
 
-
-
-for episode in range(1):
-    obs = env_test.observation_state
-    done = False
-    step = 0
-    while not done:
-        step += 1
-        print("episode done ", episode, "step done ", env_test.index)
-        env_test.get_agent_current_status()
-        epsilon = 0
-        obs, reward, done = play_one_step_action_augmentation(env_test, obs, epsilon)
-        print(env_test.done)
-        # if step % 1000 == 0:
-        #     training_step(batch_size)
-
-
-env_test.get_agent_current_status()
-
-x = np.where(np.array(env_test.cumulative_rewards) > 0, 1, 0)
-
-np.mean(x)
-
-model.get_weights()
-
-
-model.summary()
-
-env_train.number_of_transactions
-
-env_train.number_of_long_position
-
-env_train.number_of_short_position
-
-env_train.cumulative_rewards
-
-
-list_position = env.position_realized
-list_actions = env.actions_realized
-
-from collections import Counter
-
-Counter(list_position).keys()  # equals to list(set(words))
-Counter(list_position).values()  # counts the elements' frequency
-
-
-# Save the weights
-model.save_weights("./checkpoints/Warren_Buffet_AI")
-
-# Create a new model instance
-mode_copy = keras.models.Sequential(
-    [
-        keras.layers.Dense(32, activation="elu", input_shape=[n_inputs]),
-        keras.layers.Dense(32, activation="elu"),
-        keras.layers.Dense(n_output),
-    ]
-)
-mode_copy.get_weights()
-
-
-mode_copy.load_weights("./checkpoints/Warren_Buffet_AI")
-
-mode_copy.get_weights()

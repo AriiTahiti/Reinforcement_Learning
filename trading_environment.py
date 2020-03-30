@@ -2,6 +2,7 @@ from math import log
 
 
 class RLTradingEnvironment:
+
     def __init__(
         self,
         observation,
@@ -15,7 +16,8 @@ class RLTradingEnvironment:
     ):
 
         """
-        This function is used to instantiate the class. This instantiation
+        This function is used to instantiate the class. This include different variables that will be used to
+        analyse the performance of the agent in this specific environment
 
         Args:
             observation: it's a time series dataset containing all the observation needed to do the prediction
@@ -79,34 +81,34 @@ class RLTradingEnvironment:
         # current reward made by the agent
         self.reward = float(0)
         # list of all the reward realized
-        self.cumulative_rewards = [0]
+        self.all_step_rewards = [0]
         # portfolio log return
         self.log_return_portfolio = 0
+
 
         # boolean object to determine if we reach the end of the dataset
         self.done = False
 
-    # function to compute reward
     def reward_function(
         self,
-        traded_amount,
-        current_portfolio_amount,
-        entering_price,
-        next_close_price,
-        next_open_price,
-        current_position,
-        action,
+        traded_amount: float,
+        current_portfolio_amount: float,
+        entering_price: float,
+        next_close_price: float,
+        next_open_price: float,
+        current_position: int,
+        action: int,
     ):
 
         """
         Args:
             traded_amount: is the amount in the current position open
-            current_portfolio_amount :
+            current_portfolio_amount : it'sthe current portfolio amount
             entering_price: price we enter into the position
             next_close_price: it's the next close price to compute the reward if we stay in current position
             next_open_price:  it's the next open price to compute the reward if we leave the current position
-            current_position: is the
-            action:
+            current_position: it's the current position state of the agent
+            action: is the current action taken by the agent
 
         Returns: the function output the return amount on the trading decision.
 
@@ -158,7 +160,20 @@ class RLTradingEnvironment:
         return rewarded_action, new_portfolio_value
 
     # function to move in the environment
-    def step(self, action):
+    def step(self, action: int):
+        """
+        This function make a move in the time series dataset, and update the situation of the agent in the environment
+
+
+        Args:
+            action: Take the action decided by the agent
+
+        Returns: This function returns 3 elements.
+            The new observation available for the agent
+            The reward realised by the agent (the one used to train the model)
+            The indicator that determine if you reached the end of the dataset
+
+        """
 
         # if done than reset data :
         if self.done:
@@ -229,7 +244,7 @@ class RLTradingEnvironment:
             self.current_action,
         )
 
-        self.cumulative_rewards.append(self.reward)
+        self.all_step_rewards.append(self.reward)
 
         self.log_return_portfolio = 0
 
@@ -255,6 +270,9 @@ class RLTradingEnvironment:
         return self.observation_state, self.log_return_portfolio, self.done
 
     def get_agent_current_status(self):
+        """
+        Returns: This function only print the current information about the environment
+        """
 
         print("Current Agent Position ", self.current_position_state)
         print("------------------------")
@@ -271,8 +289,8 @@ class RLTradingEnvironment:
 
     def reset(self):
         """
-        The reset function is used to rest the time series, so the agent
-        will start to learn again on the same dataset
+        Returns: The reset function is used to rest the time series, so the agent will start to learn again on
+        the same dataset
         """
         self.index = 0
 
